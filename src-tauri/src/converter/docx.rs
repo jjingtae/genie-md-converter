@@ -26,8 +26,9 @@ pub fn convert(path: &Path) -> Result<String, String> {
 }
 
 fn parse_document_xml(xml: &str) -> Result<String, String> {
+    // trim_text를 false로 설정하여 공백 보존
     let mut reader = Reader::from_str(xml);
-    reader.trim_text(true);
+    reader.trim_text(false);
 
     let mut output: Vec<String> = Vec::new();
     let mut current_line = String::new();
@@ -36,21 +37,77 @@ fn parse_document_xml(xml: &str) -> Result<String, String> {
     let mut is_italic = false;
     let mut is_heading = false;
     let mut heading_level: u8 = 0;
-    let mut in_table = false;
+    let mut _in_table = false;
     let mut table_row: Vec<String> = Vec::new();
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_cell = String::new();
     let mut in_cell = false;
     let mut list_level: i32 = -1;
+    let mut _in_run = false;
+    let mut in_text = false;
+    let mut preserve_space = false;
     let mut buf: Vec<u8> = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) => {
-                handle_start_tag(e.name().as_ref(), &e, &mut in_paragraph, &mut current_line,
-                    &mut is_heading, &mut heading_level, &mut list_level,
-                    &mut is_bold, &mut is_italic, &mut in_table, &mut table_rows,
-                    &mut table_row, &mut in_cell, &mut current_cell);
+                let name = e.name();
+                let name_bytes = name.as_ref();
+
+                if name_bytes == b"w:p" {
+                    in_paragraph = true;
+                    current_line.clear();
+                    is_heading = false;
+                    heading_level = 0;
+                    list_level = -1;
+                }
+                if name_bytes == b"w:pStyle" {
+                    check_style(e, &mut is_heading, &mut heading_level, &mut list_level);
+                }
+                if name_bytes == b"w:ilvl" {
+                    check_ilvl(e, &mut list_level);
+                }
+                if name_bytes == b"w:r" {
+                    _in_run = true;
+                    is_bold = false;
+                    is_italic = false;
+                }
+                if name_bytes == b"w:rPr" {
+                    // run properties 시작
+                }
+                if name_bytes == b"w:b" { is_bold = true; }
+                if name_bytes == b"w:i" { is_italic = true; }
+                if name_bytes == b"w:t" {
+                    in_text = true;
+                    // xml:space="preserve" 확인
+                    preserve_space = false;
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"xml:space" {
+                            let val = String::from_utf8_lossy(&attr.value);
+                            if val == "preserve" {
+                                preserve_space = true;
+                            }
+                        }
+                    }
+                }
+                if name_bytes == b"w:tbl" {
+                    _in_table = true;
+                    table_rows.clear();
+                }
+                if name_bytes == b"w:tr" {
+                    table_row.clear();
+                }
+                if name_bytes == b"w:tc" {
+                    in_cell = true;
+                    current_cell.clear();
+                }
+                if name_bytes == b"w:tab" || name_bytes == b"w:tab/" {
+                    if in_cell {
+                        current_cell.push('\t');
+                    } else {
+                        current_line.push('\t');
+                    }
+                }
             }
             Ok(Event::Empty(ref e)) => {
                 let name = e.name();
@@ -61,15 +118,35 @@ fn parse_document_xml(xml: &str) -> Result<String, String> {
                     if in_cell { current_cell.push(' '); }
                     else { current_line.push('\n'); }
                 }
+                if name_bytes == b"w:tab" {
+                    if in_cell { current_cell.push('\t'); }
+                    else { current_line.push('\t'); }
+                }
                 if name_bytes == b"w:pStyle" {
-                    check_style(&e, &mut is_heading, &mut heading_level, &mut list_level);
+                    check_style(e, &mut is_heading, &mut heading_level, &mut list_level);
                 }
                 if name_bytes == b"w:ilvl" {
-                    check_ilvl(&e, &mut list_level);
+                    check_ilvl(e, &mut list_level);
+                }
+                // 빈 <w:t/> 처리
+                if name_bytes == b"w:t" {
+                    // 빈 텍스트 노드 — 공백 추가
                 }
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.unescape().unwrap_or_default().to_string();
+                if !in_text {
+                    buf.clear();
+                    continue;
+                }
+                let raw_text = e.unescape().unwrap_or_default().to_string();
+                if raw_text.is_empty() { buf.clear(); continue; }
+
+                let text = if preserve_space {
+                    raw_text
+                } else {
+                    raw_text.trim().to_string()
+                };
+
                 if text.is_empty() { buf.clear(); continue; }
 
                 let formatted = if is_bold && is_italic {
@@ -83,8 +160,25 @@ fn parse_document_xml(xml: &str) -> Result<String, String> {
                 };
 
                 if in_cell {
+                    // 셀 내에서 단어 사이 공백 보장
+                    if !current_cell.is_empty() && !current_cell.ends_with(' ') && !current_cell.ends_with('\t') {
+                        // 이전 텍스트와 현재 텍스트 사이에 공백이 필요한지 확인
+                        let last_char = current_cell.chars().last().unwrap_or(' ');
+                        let first_char = formatted.chars().next().unwrap_or(' ');
+                        if last_char.is_alphanumeric() && first_char.is_alphanumeric() {
+                            current_cell.push(' ');
+                        }
+                    }
                     current_cell.push_str(&formatted);
                 } else {
+                    // 단어 사이 공백 보장
+                    if !current_line.is_empty() && !current_line.ends_with(' ') && !current_line.ends_with('\n') && !current_line.ends_with('\t') {
+                        let last_char = current_line.chars().last().unwrap_or(' ');
+                        let first_char = formatted.chars().next().unwrap_or(' ');
+                        if last_char.is_alphanumeric() && first_char.is_alphanumeric() {
+                            current_line.push(' ');
+                        }
+                    }
                     current_line.push_str(&formatted);
                 }
             }
@@ -92,13 +186,19 @@ fn parse_document_xml(xml: &str) -> Result<String, String> {
                 let name = e.name();
                 let name_bytes = name.as_ref();
 
+                if name_bytes == b"w:t" {
+                    in_text = false;
+                    preserve_space = false;
+                }
                 if name_bytes == b"w:r" {
-                    is_bold = false;
-                    is_italic = false;
+                    _in_run = false;
                 }
                 if name_bytes == b"w:p" {
                     if in_cell {
-                        // 셀 내 단락
+                        // 셀 내 여러 단락이면 공백으로 연결
+                        if !current_cell.is_empty() {
+                            current_cell.push(' ');
+                        }
                     } else if in_paragraph {
                         let line = current_line.trim().to_string();
                         if is_heading && !line.is_empty() {
@@ -124,7 +224,7 @@ fn parse_document_xml(xml: &str) -> Result<String, String> {
                     table_row.clear();
                 }
                 if name_bytes == b"w:tbl" {
-                    in_table = false;
+                    _in_table = false;
                     if !table_rows.is_empty() {
                         let md_table = render_table(&table_rows);
                         output.push(md_table);
@@ -155,51 +255,6 @@ fn parse_document_xml(xml: &str) -> Result<String, String> {
     }
 
     Ok(result.join("\n"))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn handle_start_tag(
-    name_bytes: &[u8],
-    e: &quick_xml::events::BytesStart,
-    in_paragraph: &mut bool,
-    current_line: &mut String,
-    is_heading: &mut bool,
-    heading_level: &mut u8,
-    list_level: &mut i32,
-    is_bold: &mut bool,
-    is_italic: &mut bool,
-    in_table: &mut bool,
-    table_rows: &mut Vec<Vec<String>>,
-    table_row: &mut Vec<String>,
-    in_cell: &mut bool,
-    current_cell: &mut String,
-) {
-    if name_bytes == b"w:p" {
-        *in_paragraph = true;
-        current_line.clear();
-        *is_heading = false;
-        *heading_level = 0;
-        *list_level = -1;
-    }
-    if name_bytes == b"w:pStyle" {
-        check_style(e, is_heading, heading_level, list_level);
-    }
-    if name_bytes == b"w:ilvl" {
-        check_ilvl(e, list_level);
-    }
-    if name_bytes == b"w:b" { *is_bold = true; }
-    if name_bytes == b"w:i" { *is_italic = true; }
-    if name_bytes == b"w:tbl" {
-        *in_table = true;
-        table_rows.clear();
-    }
-    if name_bytes == b"w:tr" {
-        table_row.clear();
-    }
-    if name_bytes == b"w:tc" {
-        *in_cell = true;
-        current_cell.clear();
-    }
 }
 
 fn check_style(e: &quick_xml::events::BytesStart, is_heading: &mut bool, heading_level: &mut u8, list_level: &mut i32) {
@@ -236,15 +291,6 @@ fn render_table(rows: &[Vec<String>]) -> String {
     let max_cols = rows.iter().map(|r| r.len()).max().unwrap_or(0);
     if max_cols == 0 { return String::new(); }
 
-    let mut col_widths = vec![3usize; max_cols];
-    for row in rows {
-        for (i, cell) in row.iter().enumerate() {
-            if i < max_cols {
-                col_widths[i] = col_widths[i].max(cell.len()).max(3);
-            }
-        }
-    }
-
     let mut lines: Vec<String> = Vec::new();
 
     for (row_idx, row) in rows.iter().enumerate() {
@@ -256,9 +302,8 @@ fn render_table(rows: &[Vec<String>]) -> String {
         lines.push(format!("|{}|", cells.join("|")));
 
         if row_idx == 0 {
-            let sep: Vec<String> = col_widths
-                .iter()
-                .map(|w| format!(" {} ", "-".repeat(*w)))
+            let sep: Vec<String> = (0..max_cols)
+                .map(|_| " --- ".to_string())
                 .collect();
             lines.push(format!("|{}|", sep.join("|")));
         }

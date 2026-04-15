@@ -203,14 +203,17 @@
       display: flex;
       gap: 16px;
       min-height: 0;
+      overflow: hidden;
     }
     .viewer-pane {
       flex: 1;
+      min-width: 0;
       background: #fff;
       border: 1px solid #e8ecf1;
       border-radius: 12px;
       padding: 20px;
       overflow-y: auto;
+      overflow-x: auto;
       font-size: 13.5px;
       line-height: 1.8;
       color: #333;
@@ -224,6 +227,24 @@
       white-space: pre-wrap;
       word-break: break-all;
     }
+    .viewer-pane table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+    .viewer-pane th, .viewer-pane td {
+      border: 1px solid #ddd;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .viewer-pane th {
+      background: #f5f7fa;
+      font-weight: 700;
+    }
+    .viewer-pane h1 { font-size: 22px; margin: 16px 0 8px; }
+    .viewer-pane h2 { font-size: 18px; margin: 14px 0 6px; }
+    .viewer-pane h3 { font-size: 15px; margin: 12px 0 4px; }
     .viewer-pane-label {
       font-size: 12px;
       font-weight: 700;
@@ -539,18 +560,78 @@
   }
 
   function simpleMarkdownRender(md) {
-    let html = md
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    const lines = md.split('\n');
+    let html = '';
+    let inTable = false;
+    let tableHtml = '';
+    let isHeader = true;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // 표 감지: | 로 시작하는 줄
+      if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        // 구분선인지 확인 (| --- | --- |)
+        if (/^\|[\s\-:|]+\|$/.test(trimmed)) {
+          continue; // 구분선 건너뛰기
+        }
+        if (!inTable) {
+          inTable = true;
+          isHeader = true;
+          tableHtml = '<table>';
+        }
+        const cells = trimmed.split('|').filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
+        const tag = isHeader ? 'th' : 'td';
+        tableHtml += '<tr>' + cells.map(c => `<${tag}>${escapeHtml(c.trim())}</${tag}>`).join('') + '</tr>';
+        // 다음 줄이 구분선이면 이 줄은 헤더
+        if (isHeader && i + 1 < lines.length && /^\|[\s\-:|]+\|$/.test(lines[i + 1].trim())) {
+          isHeader = false;
+        } else {
+          isHeader = false;
+        }
+        continue;
+      } else if (inTable) {
+        inTable = false;
+        tableHtml += '</table>';
+        html += tableHtml;
+        tableHtml = '';
+      }
+
+      // 제목
+      let processed = escapeHtml(trimmed);
+      if (trimmed.startsWith('### ')) {
+        html += '<h3>' + escapeHtml(trimmed.slice(4)) + '</h3>';
+      } else if (trimmed.startsWith('## ')) {
+        html += '<h2>' + escapeHtml(trimmed.slice(3)) + '</h2>';
+      } else if (trimmed.startsWith('# ')) {
+        html += '<h1>' + escapeHtml(trimmed.slice(2)) + '</h1>';
+      } else if (trimmed.startsWith('- ')) {
+        html += '• ' + formatInline(trimmed.slice(2)) + '<br>';
+      } else if (trimmed === '') {
+        html += '<br>';
+      } else {
+        html += formatInline(trimmed) + '<br>';
+      }
+    }
+
+    if (inTable) {
+      tableHtml += '</table>';
+      html += tableHtml;
+    }
+
+    return html;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function formatInline(str) {
+    return escapeHtml(str)
       .replace(/\*\*\*(.+?)\*\*\*/g, '<b><i>$1</i></b>')
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-      .replace(/\*(.+?)\*/g, '<i>$1</i>')
-      .replace(/^- (.+)$/gm, '• $1<br>')
-      .replace(/\n\n/g, '<br><br>')
-      .replace(/\n/g, '<br>');
-    return html;
+      .replace(/\*(.+?)\*/g, '<i>$1</i>');
   }
 
   // 뷰어 모드 전환

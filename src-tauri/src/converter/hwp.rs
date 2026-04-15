@@ -173,7 +173,9 @@ fn extract_para_text(data: &[u8]) -> String {
             // 일반 문자
             _ => {
                 if let Some(c) = char::from_u32(ch as u32) {
-                    text.push(c);
+                    if !c.is_control() {
+                        text.push(c);
+                    }
                 }
             }
         }
