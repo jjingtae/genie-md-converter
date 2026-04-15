@@ -26,3 +26,7 @@ flate2 = "1"
 # 유틸
 encoding_rs = "0.8"
 regex = "1"
+ 
+[features] 
+default = ["custom-protocol"] 
+custom-protocol = ["tauri/custom-protocol"] 
