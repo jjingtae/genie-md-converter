@@ -1,0 +1,11 @@
+{
+  "name": "genie-md-converter",
+  "version": "1.0.0",
+  "description": "문서를 Markdown으로 변환하는 도구",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5"
+  }
+}

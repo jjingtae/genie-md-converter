@@ -1,0 +1,45 @@
+{
+  "build": {
+    "distDir": "../src",
+    "devPath": "../src"
+  },
+  "package": {
+    "productName": "지니 MD 변환기",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "dialog": {
+        "open": true,
+        "save": true
+      },
+      "shell": {
+        "open": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "identifier": "com.genie.md-converter",
+      "icon": [
+        "icons/icon.png"
+      ],
+      "targets": ["nsis"],
+      "windows": {
+        "nsis": {
+          "installMode": "currentUser"
+        }
+      }
+    },
+    "windows": [
+      {
+        "title": "지니 MD 변환기",
+        "width": 600,
+        "height": 700,
+        "resizable": true,
+        "center": true,
+        "minWidth": 500,
+        "minHeight": 500
+      }
+    ]
+  }
+}

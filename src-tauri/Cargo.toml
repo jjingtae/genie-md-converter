@@ -1,0 +1,28 @@
+[package]
+name = "genie-md-converter"
+version = "1.0.0"
+description = "문서를 Markdown으로 변환하는 도구"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1", features = [] }
+
+[dependencies]
+tauri = { version = "1", features = ["dialog-open", "dialog-save", "shell-open"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# PDF 텍스트 추출
+pdf-extract = "0.7"
+
+# DOCX 파싱 (zip + xml)
+zip = "0.6"
+quick-xml = "0.31"
+
+# HWP 파싱 (OLE compound file + 압축 해제)
+cfb = "0.9"
+flate2 = "1"
+
+# 유틸
+encoding_rs = "0.8"
+regex = "1"
