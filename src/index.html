@@ -583,7 +583,7 @@
         }
         const cells = trimmed.split('|').filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
         const tag = isHeader ? 'th' : 'td';
-        tableHtml += '<tr>' + cells.map(c => `<${tag}>${escapeHtml(c.trim())}</${tag}>`).join('') + '</tr>';
+        tableHtml += '<tr>' + cells.map(c => `<${tag}>${escapeHtmlPreserveBr(c.trim())}</${tag}>`).join('') + '</tr>';
         // 다음 줄이 구분선이면 이 줄은 헤더
         if (isHeader && i + 1 < lines.length && /^\|[\s\-:|]+\|$/.test(lines[i + 1].trim())) {
           isHeader = false;
@@ -627,8 +627,15 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function escapeHtmlPreserveBr(str) {
+    // <br>를 임시로 치환 → escape → <br> 복원
+    return str.replace(/<br>/g, '\x00BR\x00')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\x00BR\x00/g, '<br>');
+  }
+
   function formatInline(str) {
-    return escapeHtml(str)
+    return escapeHtmlPreserveBr(str)
       .replace(/\*\*\*(.+?)\*\*\*/g, '<b><i>$1</i></b>')
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
       .replace(/\*(.+?)\*/g, '<i>$1</i>');
