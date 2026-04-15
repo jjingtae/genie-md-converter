@@ -1,7 +1,8 @@
 {
   "build": {
     "distDir": "../src",
-    "devPath": "../src"
+    "devPath": "../src",
+    "withGlobalTauri": true
   },
   "package": {
     "productName": "지니 MD 변환기",
@@ -15,12 +16,16 @@
       },
       "shell": {
         "open": true
+      },
+      "clipboard": {
+        "writeText": true
       }
     },
     "bundle": {
       "active": true,
       "identifier": "com.genie.md-converter",
       "icon": [
+        "icons/icon.ico",
         "icons/icon.png"
       ],
       "targets": ["nsis"],
@@ -33,12 +38,12 @@
     "windows": [
       {
         "title": "지니 MD 변환기",
-        "width": 600,
-        "height": 700,
+        "width": 960,
+        "height": 680,
         "resizable": true,
         "center": true,
-        "minWidth": 500,
-        "minHeight": 500
+        "minWidth": 800,
+        "minHeight": 550
       }
     ]
   }

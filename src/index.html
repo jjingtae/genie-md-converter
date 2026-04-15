@@ -4,456 +4,678 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>지니 MD 변환기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
-      font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
+      font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+      display: flex;
+      height: 100vh;
+      background: #f5f7fa;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── 사이드바 ── */
+    .sidebar {
+      width: 170px;
+      background: #fff;
+      border-right: 1px solid #e8ecf1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0;
+    }
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      font-size: 17px;
+      font-weight: 700;
+      color: #2d7ff9;
+    }
+    .sidebar-logo span { font-size: 14px; }
+    .nav-item {
       display: flex;
       align-items: center;
-      justify-content: center;
-    }
-
-    .container {
-      background: white;
-      border-radius: 20px;
-      padding: 40px 36px 32px;
-      width: 520px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-
-    h1 {
-      text-align: center;
-      font-size: 22px;
-      color: #333;
-      margin-bottom: 6px;
-    }
-
-    .subtitle {
-      text-align: center;
-      font-size: 13px;
-      color: #999;
-      margin-bottom: 28px;
-    }
-
-    /* 드롭존 */
-    #drop-zone {
-      border: 2px dashed #ccc;
-      border-radius: 16px;
-      padding: 40px 20px;
-      text-align: center;
+      gap: 10px;
+      padding: 12px 20px;
       cursor: pointer;
-      transition: all 0.3s;
-      background: #fafbff;
+      font-size: 13.5px;
+      color: #555;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: #f0f5ff; }
+    .nav-item.active {
+      color: #2d7ff9;
+      font-weight: 700;
+      background: #f0f5ff;
+      border-left-color: #2d7ff9;
+    }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 12px 20px;
+      font-size: 11px;
+      color: #aab;
+      line-height: 1.5;
     }
 
-    #drop-zone:hover, #drop-zone.drag-over {
-      border-color: #667eea;
-      background: #f0f3ff;
+    /* ── 메인 ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
-    #drop-zone .icon { font-size: 48px; margin-bottom: 10px; }
-    #drop-zone .main-text { font-size: 14px; color: #555; }
-    #drop-zone .sub-text { font-size: 12px; color: #aaa; margin-top: 6px; }
+    /* ── 탭바 ── */
+    .tab-bar {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      padding: 16px 20px 12px;
+      background: #fff;
+      border-bottom: 1px solid #e8ecf1;
+    }
+    .tab-btn {
+      padding: 8px 24px;
+      border: none;
+      border-radius: 20px;
+      font-size: 13.5px;
+      font-family: inherit;
+      cursor: pointer;
+      background: transparent;
+      color: #666;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #f0f5ff; }
+    .tab-btn.active {
+      background: #2d7ff9;
+      color: #fff;
+      font-weight: 500;
+    }
 
-    .supported { font-size: 11px; color: #bbb; text-align: center; margin-top: 8px; }
-
-    /* 파일 목록 */
-    #file-list {
-      margin-top: 20px;
-      max-height: 200px;
+    /* ── 컨텐츠 ── */
+    .content {
+      flex: 1;
       overflow-y: auto;
-      display: none;
+      padding: 24px 30px;
     }
+    .tab-panel { display: none; height: 100%; }
+    .tab-panel.active { display: flex; flex-direction: column; }
 
-    .file-item {
+    /* ── 드롭존 ── */
+    .drop-zone {
+      flex: 1;
+      border: 2px dashed #c8d6e5;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.25s;
+      background: #fff;
+      min-height: 280px;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #2d7ff9;
+      background: #f0f5ff;
+    }
+    .drop-zone .arrow { font-size: 36px; color: #2d7ff9; margin-bottom: 16px; }
+    .drop-zone .title { font-size: 16px; font-weight: 700; color: #333; }
+    .drop-zone .desc { font-size: 13px; color: #999; margin-top: 8px; }
+
+    /* ── 변환 결과 ── */
+    .result-area { display: none; margin-top: 20px; }
+    .result-area.show { display: block; }
+    .info-cards {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .info-card {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #e8ecf1;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .info-card .label { font-size: 11px; color: #999; margin-bottom: 4px; }
+    .info-card .value { font-size: 18px; font-weight: 700; color: #333; }
+    .info-card .value.small { font-size: 14px; }
+    .action-btns {
+      display: flex;
+      gap: 10px;
+    }
+    .action-btns button {
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid #e0e0e0;
+      background: #fff;
+      color: #444;
+    }
+    .action-btns button:hover { background: #f5f5f5; }
+    .action-btns button.primary {
+      background: #2d7ff9;
+      color: #fff;
+      border-color: #2d7ff9;
+    }
+    .action-btns button.primary:hover { background: #1a6de0; }
+
+    /* ── 뷰어 ── */
+    .viewer-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 14px;
-      background: #f8f9fc;
-      border-radius: 10px;
-      margin-bottom: 6px;
-      font-size: 13px;
-    }
-
-    .file-item .name {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: #333;
-    }
-
-    .file-item .status {
-      font-size: 12px;
-      margin-left: 10px;
-      white-space: nowrap;
-    }
-
-    .file-item .status.waiting { color: #aaa; }
-    .file-item .status.converting { color: #667eea; }
-    .file-item .status.done { color: #27ae60; }
-    .file-item .status.error { color: #e74c3c; }
-
-    .file-item .remove {
-      cursor: pointer;
-      color: #ccc;
-      margin-left: 8px;
-      font-size: 16px;
-      transition: color 0.2s;
-    }
-
-    .file-item .remove:hover { color: #e74c3c; }
-
-    /* 버튼 */
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    button {
-      flex: 1;
-      padding: 14px;
-      border: none;
+      background: #fff;
+      border: 1px solid #e8ecf1;
       border-radius: 12px;
-      font-size: 14px;
-      font-weight: bold;
+      padding: 14px 20px;
+      margin-bottom: 16px;
+    }
+    .viewer-header .file-info { flex: 1; }
+    .viewer-header .file-name { font-size: 15px; font-weight: 700; color: #333; }
+    .viewer-header .file-desc { font-size: 12px; color: #999; margin-top: 2px; }
+    .viewer-modes {
+      display: flex;
+      gap: 4px;
+    }
+    .viewer-modes button {
+      padding: 6px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 12px;
       font-family: inherit;
       cursor: pointer;
-      transition: all 0.2s;
+      background: #fff;
+      color: #555;
+      transition: all 0.15s;
     }
-
-    #btn-convert {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
+    .viewer-modes button:hover { background: #f0f0f0; }
+    .viewer-modes button.active { background: #2d7ff9; color: #fff; border-color: #2d7ff9; }
+    .viewer-body {
+      flex: 1;
+      display: flex;
+      gap: 16px;
+      min-height: 0;
     }
-
-    #btn-convert:hover { opacity: 0.9; transform: translateY(-1px); }
-    #btn-convert:disabled { background: #ccc; cursor: not-allowed; transform: none; }
-
-    #btn-reset {
-      background: #f0f0f0;
-      color: #666;
-      flex: 0.4;
-    }
-
-    #btn-reset:hover { background: #e0e0e0; }
-
-    /* 진행바 */
-    #progress-wrap {
-      margin-top: 16px;
-      display: none;
-    }
-
-    #progress-bar-bg {
-      width: 100%;
-      height: 8px;
-      background: #e8e8e8;
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    #progress-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      border-radius: 10px;
-      transition: width 0.3s;
-    }
-
-    #progress-text {
-      text-align: center;
-      font-size: 12px;
-      color: #888;
-      margin-top: 6px;
-    }
-
-    /* 결과 */
-    #result {
-      margin-top: 16px;
-      text-align: center;
-      font-size: 13px;
-      display: none;
-    }
-
-    #result .success { color: #27ae60; font-weight: bold; }
-    #result .fail { color: #e74c3c; }
-
-    /* 미리보기 */
-    #preview-wrap {
-      margin-top: 16px;
-      display: none;
-    }
-
-    #preview-wrap h3 {
-      font-size: 13px;
-      color: #666;
-      margin-bottom: 8px;
-    }
-
-    #preview {
-      background: #f8f9fc;
-      border: 1px solid #e8e8e8;
-      border-radius: 10px;
-      padding: 16px;
-      max-height: 300px;
+    .viewer-pane {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #e8ecf1;
+      border-radius: 12px;
+      padding: 20px;
       overflow-y: auto;
-      font-size: 13px;
-      line-height: 1.7;
+      font-size: 13.5px;
+      line-height: 1.8;
       color: #333;
+    }
+    .viewer-pane.source {
+      background: #1e2330;
+      color: #c8d6e5;
+      font-family: 'Consolas', 'D2Coding', monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
       white-space: pre-wrap;
       word-break: break-all;
     }
-
-    footer {
-      text-align: center;
-      font-size: 10px;
-      color: #ccc;
-      margin-top: 20px;
+    .viewer-pane-label {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
     }
+    .viewer-pane-label.render { color: #2d7ff9; }
+    .viewer-pane-label.source { color: #57a0d3; }
+    .viewer-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    /* ── 대량 변환 ── */
+    .batch-list {
+      background: #fff;
+      border: 1px solid #e8ecf1;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .batch-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+    .batch-item:last-child { border-bottom: none; }
+    .batch-item .fname { flex: 1; color: #333; }
+    .batch-item .status { font-size: 12px; }
+    .batch-item .status.done { color: #27ae60; }
+    .batch-item .status.error { color: #e74c3c; }
+    .batch-item .status.waiting { color: #aaa; }
+    .batch-item .remove-btn {
+      cursor: pointer; color: #ccc; margin-left: 10px;
+      font-size: 16px; transition: color 0.15s;
+    }
+    .batch-item .remove-btn:hover { color: #e74c3c; }
+
+    /* ── 로딩 ── */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 30px;
+    }
+    .loading.show { display: block; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #2d7ff9;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 13px; color: #888; }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>✨ 지니 MD 변환기 ✨</h1>
-  <p class="subtitle">문서를 Markdown으로 변환합니다</p>
-
-  <div id="drop-zone">
-    <div class="icon">📂</div>
-    <div class="main-text">파일을 여기에 끌어다 놓으세요</div>
-    <div class="sub-text">또는 클릭해서 선택</div>
+<!-- 사이드바 -->
+<div class="sidebar">
+  <div class="sidebar-logo">🧞 <span>지니 MD</span></div>
+  <div class="nav-item active" data-tab="convert">
+    <span class="icon">📄</span> 문서 변환
   </div>
-  <div class="supported">지원: PDF, DOCX, HWP, TXT</div>
+  <div class="nav-item" data-tab="viewer">
+    <span class="icon">👁</span> 뷰어
+  </div>
+  <div class="nav-item" data-tab="batch">
+    <span class="icon">📦</span> 대량 변환
+  </div>
+  <div class="nav-item" data-tab="export">
+    <span class="icon">↗</span> MD 내보내기
+  </div>
+  <div class="sidebar-footer">
+    변환 엔진: Rust<br>버전 1.0.0
+  </div>
+</div>
 
-  <div id="file-list"></div>
-
-  <div class="btn-row">
-    <button id="btn-convert" disabled>변환 시작</button>
-    <button id="btn-reset">초기화</button>
+<!-- 메인 -->
+<div class="main">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="convert">변환</button>
+    <button class="tab-btn" data-tab="viewer">뷰어</button>
+    <button class="tab-btn" data-tab="batch">대량</button>
+    <button class="tab-btn" data-tab="export">MD변환</button>
   </div>
 
-  <div id="progress-wrap">
-    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
-    <div id="progress-text">준비 중...</div>
+  <div class="content">
+    <!-- 변환 탭 -->
+    <div class="tab-panel active" id="panel-convert">
+      <div class="drop-zone" id="drop-zone-convert">
+        <div class="arrow">↓</div>
+        <div class="title">문서를 드래그하거나 클릭하세요</div>
+        <div class="desc">HWP, HWPX, PDF, DOCX 파일을 Markdown으로 변환합니다</div>
+      </div>
+      <div class="loading" id="loading-convert">
+        <div class="spinner"></div>
+        <div class="loading-text">변환 중...</div>
+      </div>
+      <div class="result-area" id="result-convert">
+        <div class="info-cards">
+          <div class="info-card">
+            <div class="label">파일명</div>
+            <div class="value small" id="r-filename">-</div>
+          </div>
+          <div class="info-card">
+            <div class="label">소요시간</div>
+            <div class="value" id="r-time">-</div>
+          </div>
+          <div class="info-card">
+            <div class="label">글자수</div>
+            <div class="value" id="r-chars">-</div>
+          </div>
+          <div class="info-card">
+            <div class="label">엔진</div>
+            <div class="value small" id="r-engine">Rust</div>
+          </div>
+        </div>
+        <div class="action-btns">
+          <button class="primary" id="btn-view">뷰어에서 보기</button>
+          <button id="btn-save">MD 파일 저장</button>
+          <button id="btn-copy">클립보드 복사</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 뷰어 탭 -->
+    <div class="tab-panel" id="panel-viewer">
+      <div id="viewer-content" style="display:none; flex:1; display:flex; flex-direction:column;">
+        <div class="viewer-header">
+          <div class="file-info">
+            <div class="file-name" id="v-filename">-</div>
+            <div class="file-desc">렌더, 나란히, 소스 보기 모드를 전환할 수 있습니다.</div>
+          </div>
+          <div class="action-btns" style="margin-right:12px;">
+            <button id="v-btn-save">MD 저장</button>
+            <button id="v-btn-copy">복사</button>
+          </div>
+          <div class="viewer-modes">
+            <button data-mode="render">렌더</button>
+            <button data-mode="side" class="active">나란히</button>
+            <button data-mode="source">소스</button>
+          </div>
+        </div>
+        <div class="viewer-body" id="viewer-body">
+          <div style="flex:1; display:flex; flex-direction:column;">
+            <div class="viewer-pane-label render">렌더링</div>
+            <div class="viewer-pane" id="v-render"></div>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column;">
+            <div class="viewer-pane-label source">Markdown 소스</div>
+            <div class="viewer-pane source" id="v-source"></div>
+          </div>
+        </div>
+      </div>
+      <div class="viewer-empty" id="viewer-empty">변환된 문서가 없습니다. 변환 탭에서 문서를 변환하세요.</div>
+    </div>
+
+    <!-- 대량 변환 탭 -->
+    <div class="tab-panel" id="panel-batch">
+      <div class="drop-zone" id="drop-zone-batch" style="min-height:160px; margin-bottom:16px;">
+        <div class="arrow">↓</div>
+        <div class="title">여러 파일을 드래그하거나 클릭하세요</div>
+        <div class="desc">HWP, PDF, DOCX 파일을 한번에 변환합니다</div>
+      </div>
+      <div class="batch-list" id="batch-list" style="display:none;"></div>
+      <div class="action-btns">
+        <button class="primary" id="btn-batch-start" disabled>일괄 변환 시작</button>
+        <button id="btn-batch-clear">초기화</button>
+      </div>
+    </div>
+
+    <!-- MD 내보내기 탭 -->
+    <div class="tab-panel" id="panel-export">
+      <div class="viewer-empty" id="export-empty">변환된 문서가 없습니다.</div>
+      <div id="export-content" style="display:none;">
+        <div class="info-cards" style="margin-bottom:16px;">
+          <div class="info-card">
+            <div class="label">파일명</div>
+            <div class="value small" id="e-filename">-</div>
+          </div>
+          <div class="info-card">
+            <div class="label">글자수</div>
+            <div class="value" id="e-chars">-</div>
+          </div>
+        </div>
+        <div class="action-btns" style="margin-bottom:16px;">
+          <button class="primary" id="e-btn-save">MD 파일로 저장</button>
+          <button id="e-btn-copy">클립보드 복사</button>
+        </div>
+        <div class="viewer-pane source" id="e-source" style="height:300px;"></div>
+      </div>
+    </div>
   </div>
-
-  <div id="result"></div>
-
-  <div id="preview-wrap">
-    <h3>📄 변환 결과 미리보기</h3>
-    <div id="preview"></div>
-  </div>
-
-  <footer>© JINTAE · Powered by Rust + Tauri</footer>
 </div>
 
 <script>
-  // Tauri API
   const { invoke } = window.__TAURI__.tauri;
   const { open, save } = window.__TAURI__.dialog;
+  const { listen } = window.__TAURI__.event;
+  const { writeText } = window.__TAURI__.clipboard;
 
-  const dropZone = document.getElementById('drop-zone');
-  const fileListEl = document.getElementById('file-list');
-  const btnConvert = document.getElementById('btn-convert');
-  const btnReset = document.getElementById('btn-reset');
-  const progressWrap = document.getElementById('progress-wrap');
-  const progressBar = document.getElementById('progress-bar');
-  const progressText = document.getElementById('progress-text');
-  const resultEl = document.getElementById('result');
-  const previewWrap = document.getElementById('preview-wrap');
-  const previewEl = document.getElementById('preview');
+  // ── 상태 ──
+  let currentMd = '';
+  let currentFilename = '';
+  let batchFiles = []; // {path, name, status}
 
-  let files = []; // {path, name, status}
-
-  // ── 드래그&드롭 ──
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('drag-over');
+  // ── 탭 전환 ──
+  document.querySelectorAll('.tab-btn, .nav-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const tab = el.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+    });
   });
 
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('drag-over');
+  // ── 드래그앤드롭 (Tauri) ──
+  listen('tauri://file-drop', async (event) => {
+    const paths = event.payload;
+    if (!paths || paths.length === 0) return;
+
+    const activePanel = document.querySelector('.tab-panel.active');
+    if (activePanel.id === 'panel-convert') {
+      await convertSingle(paths[0]);
+    } else if (activePanel.id === 'panel-batch') {
+      addBatchFiles(paths);
+    }
   });
 
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    // Tauri에서는 드롭 이벤트로 파일 경로를 직접 받을 수 없으므로
-    // 파일 선택 다이얼로그 사용
-    selectFiles();
+  listen('tauri://file-drop-hover', () => {
+    const activePanel = document.querySelector('.tab-panel.active');
+    if (activePanel.id === 'panel-convert') {
+      document.getElementById('drop-zone-convert').classList.add('drag-over');
+    } else if (activePanel.id === 'panel-batch') {
+      document.getElementById('drop-zone-batch').classList.add('drag-over');
+    }
   });
 
-  dropZone.addEventListener('click', selectFiles);
+  listen('tauri://file-drop-cancelled', () => {
+    document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+  });
 
-  async function selectFiles() {
-    try {
-      const selected = await open({
-        multiple: true,
-        filters: [{
-          name: '문서',
-          extensions: ['pdf', 'docx', 'hwp', 'txt', 'md']
-        }]
-      });
+  // ── 클릭으로 파일 선택 ──
+  document.getElementById('drop-zone-convert').addEventListener('click', async () => {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '문서', extensions: ['pdf', 'docx', 'hwp', 'txt'] }]
+    });
+    if (selected) await convertSingle(selected);
+  });
 
-      if (!selected) return;
-
+  document.getElementById('drop-zone-batch').addEventListener('click', async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: '문서', extensions: ['pdf', 'docx', 'hwp', 'txt'] }]
+    });
+    if (selected) {
       const paths = Array.isArray(selected) ? selected : [selected];
-      for (const p of paths) {
-        const name = p.split('\\').pop().split('/').pop();
-        if (!files.find(f => f.path === p)) {
-          files.push({ path: p, name, status: 'waiting' });
-        }
-      }
-      renderFileList();
+      addBatchFiles(paths);
+    }
+  });
+
+  // ── 단일 변환 ──
+  async function convertSingle(filePath) {
+    const name = filePath.split('\\').pop().split('/').pop();
+    currentFilename = name;
+
+    document.getElementById('result-convert').classList.remove('show');
+    document.getElementById('loading-convert').classList.add('show');
+
+    const startTime = performance.now();
+    try {
+      currentMd = await invoke('convert_file', { path: filePath });
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+      const charCount = currentMd.length.toLocaleString();
+
+      document.getElementById('r-filename').textContent = name;
+      document.getElementById('r-time').textContent = elapsed + '초';
+      document.getElementById('r-chars').textContent = charCount;
+
+      document.getElementById('loading-convert').classList.remove('show');
+      document.getElementById('result-convert').classList.add('show');
+
+      // 내보내기 탭 업데이트
+      document.getElementById('export-empty').style.display = 'none';
+      document.getElementById('export-content').style.display = 'block';
+      document.getElementById('e-filename').textContent = name;
+      document.getElementById('e-chars').textContent = charCount;
+      document.getElementById('e-source').textContent = currentMd;
+
+      // 뷰어 업데이트
+      updateViewer();
     } catch (e) {
-      console.error('파일 선택 오류:', e);
+      document.getElementById('loading-convert').classList.remove('show');
+      alert('변환 실패: ' + e);
     }
   }
 
-  function renderFileList() {
-    if (files.length === 0) {
-      fileListEl.style.display = 'none';
-      btnConvert.disabled = true;
+  // ── 뷰어 ──
+  function updateViewer() {
+    document.getElementById('viewer-empty').style.display = 'none';
+    document.getElementById('viewer-content').style.display = 'flex';
+    document.getElementById('v-filename').textContent = currentFilename;
+    document.getElementById('v-source').textContent = currentMd;
+    document.getElementById('v-render').innerHTML = simpleMarkdownRender(currentMd);
+  }
+
+  function simpleMarkdownRender(md) {
+    let html = md
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<b><i>$1</i></b>')
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/\*(.+?)\*/g, '<i>$1</i>')
+      .replace(/^- (.+)$/gm, '• $1<br>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+    return html;
+  }
+
+  // 뷰어 모드 전환
+  document.querySelectorAll('.viewer-modes button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.viewer-modes button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const mode = btn.dataset.mode;
+      const body = document.getElementById('viewer-body');
+      const children = body.children;
+      if (mode === 'render') {
+        children[0].style.display = 'flex';
+        children[1].style.display = 'none';
+      } else if (mode === 'source') {
+        children[0].style.display = 'none';
+        children[1].style.display = 'flex';
+      } else {
+        children[0].style.display = 'flex';
+        children[1].style.display = 'flex';
+      }
+    });
+  });
+
+  // ── 버튼 이벤트 ──
+  document.getElementById('btn-view').addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-tab="viewer"]').click();
+  });
+
+  document.getElementById('btn-save').addEventListener('click', saveMd);
+  document.getElementById('v-btn-save').addEventListener('click', saveMd);
+  document.getElementById('e-btn-save').addEventListener('click', saveMd);
+
+  document.getElementById('btn-copy').addEventListener('click', copyMd);
+  document.getElementById('v-btn-copy').addEventListener('click', copyMd);
+  document.getElementById('e-btn-copy').addEventListener('click', copyMd);
+
+  async function saveMd() {
+    if (!currentMd) return;
+    const stem = currentFilename.replace(/\.[^.]+$/, '');
+    const path = await save({
+      defaultPath: stem + '.md',
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    });
+    if (path) {
+      await invoke('save_text', { text: currentMd, path: path });
+      alert('저장 완료!');
+    }
+  }
+
+  async function copyMd() {
+    if (!currentMd) return;
+    try {
+      await writeText(currentMd);
+      alert('클립보드에 복사되었습니다!');
+    } catch (e) {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = currentMd;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      alert('클립보드에 복사되었습니다!');
+    }
+  }
+
+  // ── 대량 변환 ──
+  function addBatchFiles(paths) {
+    for (const p of paths) {
+      const name = p.split('\\').pop().split('/').pop();
+      if (!batchFiles.find(f => f.path === p)) {
+        batchFiles.push({ path: p, name, status: 'waiting' });
+      }
+    }
+    renderBatchList();
+  }
+
+  function renderBatchList() {
+    const el = document.getElementById('batch-list');
+    if (batchFiles.length === 0) {
+      el.style.display = 'none';
+      document.getElementById('btn-batch-start').disabled = true;
       return;
     }
+    el.style.display = 'block';
+    document.getElementById('btn-batch-start').disabled = false;
 
-    fileListEl.style.display = 'block';
-    btnConvert.disabled = false;
-
-    fileListEl.innerHTML = files.map((f, i) => {
-      const statusClass = f.status;
-      const statusText = {
-        waiting: '대기',
-        converting: '변환 중...',
-        done: '✓ 완료',
-        error: '✗ 실패'
-      }[f.status] || '';
-
-      return `<div class="file-item">
-        <span class="name" title="${f.path}">${f.name}</span>
-        <span class="status ${statusClass}">${statusText}</span>
-        <span class="remove" onclick="removeFile(${i})">×</span>
+    el.innerHTML = batchFiles.map((f, i) => {
+      const statusText = { waiting: '대기', converting: '변환 중...', done: '✓ 완료', error: '✗ 실패' }[f.status];
+      return `<div class="batch-item">
+        <span class="fname">${f.name}</span>
+        <span class="status ${f.status}">${statusText}</span>
+        <span class="remove-btn" onclick="removeBatch(${i})">×</span>
       </div>`;
     }).join('');
   }
 
-  window.removeFile = function(idx) {
-    files.splice(idx, 1);
-    renderFileList();
+  window.removeBatch = function(idx) {
+    batchFiles.splice(idx, 1);
+    renderBatchList();
   };
 
-  // ── 변환 ──
-  btnConvert.addEventListener('click', async () => {
-    if (files.length === 0) return;
-
-    // 단일 파일 → 미리보기, 다중 파일 → 일괄 저장
-    if (files.length === 1) {
-      await convertSingle();
-    } else {
-      await convertBatch();
-    }
-  });
-
-  async function convertSingle() {
-    const file = files[0];
-    file.status = 'converting';
-    renderFileList();
-
-    progressWrap.style.display = 'block';
-    progressBar.style.width = '50%';
-    progressText.textContent = '변환 중...';
-    resultEl.style.display = 'none';
-    previewWrap.style.display = 'none';
-
-    try {
-      const md = await invoke('convert_file', { path: file.path });
-      file.status = 'done';
-      renderFileList();
-
-      progressBar.style.width = '100%';
-      progressText.textContent = '완료!';
-
-      // 미리보기
-      previewWrap.style.display = 'block';
-      previewEl.textContent = md.substring(0, 3000) + (md.length > 3000 ? '\n\n... (이하 생략)' : '');
-
-      // 저장 다이얼로그
-      const stem = file.name.replace(/\.[^.]+$/, '');
-      const savePath = await save({
-        defaultPath: stem + '.md',
-        filters: [{ name: 'Markdown', extensions: ['md'] }]
-      });
-
-      if (savePath) {
-        await invoke('convert_and_save', {
-          inputPath: file.path,
-          outputPath: savePath
-        });
-        resultEl.innerHTML = '<span class="success">✓ 저장 완료!</span>';
-        resultEl.style.display = 'block';
-      }
-    } catch (e) {
-      file.status = 'error';
-      renderFileList();
-      progressBar.style.width = '100%';
-      resultEl.innerHTML = `<span class="fail">오류: ${e}</span>`;
-      resultEl.style.display = 'block';
-    }
-  }
-
-  async function convertBatch() {
-    // 출력 폴더 선택
+  document.getElementById('btn-batch-start').addEventListener('click', async () => {
     const outDir = await open({ directory: true, title: '저장할 폴더 선택' });
     if (!outDir) return;
 
-    progressWrap.style.display = 'block';
-    resultEl.style.display = 'none';
-    previewWrap.style.display = 'none';
-
-    const paths = files.map(f => f.path);
-
-    for (let i = 0; i < files.length; i++) {
-      files[i].status = 'converting';
-      renderFileList();
-      progressBar.style.width = `${((i + 0.5) / files.length) * 100}%`;
-      progressText.textContent = `변환 중... (${i + 1}/${files.length})`;
-
+    for (let i = 0; i < batchFiles.length; i++) {
+      batchFiles[i].status = 'converting';
+      renderBatchList();
       try {
-        const stem = files[i].name.replace(/\.[^.]+$/, '');
+        const stem = batchFiles[i].name.replace(/\.[^.]+$/, '');
         const outPath = outDir + '\\' + stem + '.md';
-        await invoke('convert_and_save', {
-          inputPath: files[i].path,
-          outputPath: outPath
-        });
-        files[i].status = 'done';
+        await invoke('convert_and_save', { inputPath: batchFiles[i].path, outputPath: outPath });
+        batchFiles[i].status = 'done';
       } catch (e) {
-        files[i].status = 'error';
+        batchFiles[i].status = 'error';
       }
-      renderFileList();
+      renderBatchList();
     }
+    alert('일괄 변환 완료!');
+  });
 
-    progressBar.style.width = '100%';
-    const doneCount = files.filter(f => f.status === 'done').length;
-    const failCount = files.filter(f => f.status === 'error').length;
-    progressText.textContent = '완료!';
-    resultEl.innerHTML = `<span class="success">✓ ${doneCount}개 완료</span>` +
-      (failCount > 0 ? ` <span class="fail">(${failCount}개 실패)</span>` : '');
-    resultEl.style.display = 'block';
-  }
-
-  // ── 초기화 ──
-  btnReset.addEventListener('click', () => {
-    files = [];
-    renderFileList();
-    progressWrap.style.display = 'none';
-    progressBar.style.width = '0%';
-    resultEl.style.display = 'none';
-    previewWrap.style.display = 'none';
+  document.getElementById('btn-batch-clear').addEventListener('click', () => {
+    batchFiles = [];
+    renderBatchList();
   });
 </script>
 </body>
