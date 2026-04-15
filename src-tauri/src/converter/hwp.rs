@@ -8,8 +8,10 @@ const HWPTAG_PARA_TEXT: u16 = HWPTAG_BEGIN + 51; // 67
 
 /// HWP 파일을 Markdown으로 변환
 pub fn convert(path: &Path) -> Result<String, String> {
-    let mut comp = CompoundFile::open(path)
+    let file = std::fs::File::open(path)
         .map_err(|e| format!("HWP 파일 열기 실패: {}", e))?;
+    let mut comp = CompoundFile::open(file)
+        .map_err(|e| format!("HWP CFB 열기 실패: {}", e))?;
 
     // FileHeader에서 압축 여부 확인
     let compressed = is_compressed(&mut comp)?;
