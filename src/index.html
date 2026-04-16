@@ -1060,7 +1060,7 @@
         let attrs = '';
         if (sp[r][c].rs > 1) attrs += ' rowspan="' + sp[r][c].rs + '"';
         if (sp[r][c].cs > 1) attrs += ' colspan="' + sp[r][c].cs + '"';
-        html += '<' + tag + attrs + '>' + escapeHtmlPreserveBr(rows[r][c]) + '</' + tag + '>';
+        html += '<' + tag + attrs + '>' + formatInline(rows[r][c]) + '</' + tag + '>';
       }
       html += '</tr>';
     }
