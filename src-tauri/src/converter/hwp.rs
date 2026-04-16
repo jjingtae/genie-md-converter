@@ -102,7 +102,6 @@ fn parse_records(data: &[u8]) -> Vec<Record> {
     records
 }
 
-/// CTRL_HEADER가 테이블인지 확인 (ctrl_type == "tbl ")
 fn is_table_ctrl(data: &[u8]) -> bool {
     data.len() >= 4 && data[0..4] == TBL_CTRL_TYPE
 }
@@ -120,7 +119,6 @@ fn parse_section(data: &[u8]) -> Result<Vec<Element>, String> {
 
         let rec = &records[i];
 
-        // CTRL_HEADER + "tbl " = 표 시작
         if rec.tag_id == TAG_CTRL_HEADER && is_table_ctrl(&rec.data) {
             let (table, consumed) = parse_table(&records, i);
             elements.push(Element::Table(table));
@@ -129,7 +127,6 @@ fn parse_section(data: &[u8]) -> Result<Vec<Element>, String> {
             continue;
         }
 
-        // 일반 텍스트 (표 밖)
         if rec.tag_id == TAG_PARA_TEXT {
             let text = extract_para_text(&rec.data);
             if !text.is_empty() {
@@ -157,14 +154,11 @@ fn parse_table(records: &[Record], start: usize) -> (TableData, usize) {
     while i < records.len() {
         let rec = &records[i];
 
-        // 표 레벨 이하로 나가면 종료
         if rec.level <= ctrl_level {
             break;
         }
 
-        // LIST_HEADER = 새 셀
         if rec.tag_id == TAG_LIST_HEADER && rec.level == ctrl_level + 1 {
-            // 이전 셀 저장
             if in_cell {
                 cells.push(CellData {
                     col: cur_col, row: cur_row,
@@ -175,20 +169,17 @@ fn parse_table(records: &[Record], start: usize) -> (TableData, usize) {
             current_cell_text.clear();
             in_cell = true;
 
-            // 셀 위치 파싱 (offset 8: col, 10: row, 12: colSpan, 14: rowSpan)
             if rec.data.len() >= 16 {
                 cur_col = u16::from_le_bytes([rec.data[8], rec.data[9]]);
                 cur_row = u16::from_le_bytes([rec.data[10], rec.data[11]]);
                 cur_cspan = u16::from_le_bytes([rec.data[12], rec.data[13]]);
                 cur_rspan = u16::from_le_bytes([rec.data[14], rec.data[15]]);
-                // 유효성 검사
                 if cur_cspan == 0 { cur_cspan = 1; }
                 if cur_rspan == 0 { cur_rspan = 1; }
                 if cur_col > 50 || cur_row > 500 { cur_col = 0; cur_row = 0; }
             }
         }
 
-        // 셀 안의 텍스트
         if rec.tag_id == TAG_PARA_TEXT && in_cell && rec.level > ctrl_level {
             let text = extract_para_text(&rec.data);
             if !text.is_empty() {
@@ -202,7 +193,6 @@ fn parse_table(records: &[Record], start: usize) -> (TableData, usize) {
         i += 1;
     }
 
-    // 마지막 셀
     if in_cell {
         cells.push(CellData {
             col: cur_col, row: cur_row,
@@ -222,7 +212,6 @@ fn extract_para_text(data: &[u8]) -> String {
         let ch = u16::from_le_bytes([data[i], data[i+1]]);
         i += 2;
         match ch {
-            // 확장/인라인 컨트롤: 0,9,10,13,24,30,31 외 모든 0-31은 8wchar(16바이트)
             1..=8 | 11 | 12 | 14..=23 | 25..=29 => { i += 14; }
             9 => { text.push('\t'); }
             10 => { text.push('\n'); }
@@ -269,15 +258,12 @@ fn render_markdown(elements: &[Element]) -> String {
 fn render_table(table: &TableData) -> String {
     if table.cells.is_empty() { return String::new(); }
 
-    // 행/열 수를 셀 위치에서 계산
     let max_row = table.cells.iter().map(|c| c.row + c.row_span).max().unwrap_or(1) as usize;
     let max_col = table.cells.iter().map(|c| c.col + c.col_span).max().unwrap_or(1) as usize;
 
     if max_col == 0 || max_row == 0 { return String::new(); }
 
-    // 그리드 생성
     let mut grid: Vec<Vec<String>> = vec![vec![String::new(); max_col]; max_row];
-    let mut merged: Vec<Vec<bool>> = vec![vec![false; max_col]; max_row];
 
     for cell in &table.cells {
         let r = cell.row as usize;
@@ -286,7 +272,7 @@ fn render_table(table: &TableData) -> String {
 
         grid[r][c] = cell.text.clone();
 
-        // 병합 영역 마킹
+        // 병합 영역에 마커 삽입
         let cspan = (cell.col_span as usize).max(1);
         let rspan = (cell.row_span as usize).max(1);
         for dr in 0..rspan {
@@ -295,7 +281,11 @@ fn render_table(table: &TableData) -> String {
                 let mr = r + dr;
                 let mc = c + dc;
                 if mr < max_row && mc < max_col {
-                    merged[mr][mc] = true;
+                    if dr == 0 && dc > 0 {
+                        grid[mr][mc] = ">".to_string();
+                    } else {
+                        grid[mr][mc] = "^".to_string();
+                    }
                 }
             }
         }
@@ -306,13 +296,9 @@ fn render_table(table: &TableData) -> String {
 
     for (row_idx, row) in grid.iter().enumerate() {
         let mut cells_str: Vec<String> = Vec::new();
-        for (col_idx, cell_text) in row.iter().enumerate() {
-            if merged[row_idx][col_idx] {
-                cells_str.push(String::from("  "));
-            } else {
-                let cleaned = cell_text.replace('|', "\\|");
-                cells_str.push(format!(" {} ", cleaned));
-            }
+        for (_col_idx, cell_text) in row.iter().enumerate() {
+            let cleaned = cell_text.replace('|', "\\|");
+            cells_str.push(format!(" {} ", cleaned));
         }
         lines.push(format!("|{}|", cells_str.join("|")));
 

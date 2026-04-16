@@ -608,7 +608,8 @@
         { name: '전화번호', regex: /01[016789][\s.\-]?\d{3,4}[\s.\-]?\d{4}/g, priority: 6 },
         { name: '전화번호', regex: /0[2-6]\d{0,1}[\s.\-]\d{3,4}[\s.\-]\d{4}/g, priority: 5 },
         { name: '이메일', regex: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, priority: 4 },
-        { name: '이름', regex: /(?:성명|이름|원고|피고|신청인|피신청인|채권자|채무자|대리인|위임인|수임인|신고인|피의자|피해자|참고인|증인|감정인|보증인|임대인|임차인|매도인|매수인|양도인|양수인|위탁자|수탁자|갑|을|병|정)\s*[:：]?\s*([가-힣]{2,4})/g, priority: 3, captureGroup: 1 },
+        { name: '이름', regex: /(?:성명|이름|원고|피고|신청인|피신청인|채권자|채무자|대리인|위임인|수임인|신고인|피의자|피해자|참고인|증인|감정인|보증인|임대인|임차인|매도인|매수인|양도인|양수인|위탁자|수탁자)\s*[:：]?\s*([가-힣]{2,4})/g, priority: 3, captureGroup: 1 },
+        { name: '이름', regex: /(?:갑|을|병|정)\s*[:：]\s*([가-힣]{2,4})/g, priority: 2, captureGroup: 1 },
       ];
     }
 
@@ -971,37 +972,22 @@
   function simpleMarkdownRender(md) {
     const lines = md.split('\n');
     let html = '';
+    let tableLines = [];
     let inTable = false;
-    let tableHtml = '';
-    let isHeader = true;
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
+      const trimmed = lines[i].trim();
 
       if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-        if (/^\|[\s\-:|]+\|$/.test(trimmed)) {
-          continue;
-        }
-        if (!inTable) {
-          inTable = true;
-          isHeader = true;
-          tableHtml = '<table>';
-        }
-        const cells = trimmed.split('|').filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
-        const tag = isHeader ? 'th' : 'td';
-        tableHtml += '<tr>' + cells.map(c => `<${tag}>${escapeHtmlPreserveBr(c.trim())}</${tag}>`).join('') + '</tr>';
-        if (isHeader && i + 1 < lines.length && /^\|[\s\-:|]+\|$/.test(lines[i + 1].trim())) {
-          isHeader = false;
-        } else {
-          isHeader = false;
-        }
+        if (/^\|[\s\-:|]+\|$/.test(trimmed)) continue;
+        if (!inTable) { inTable = true; tableLines = []; }
+        const cells = trimmed.split('|').filter((c, idx, arr) => idx > 0 && idx < arr.length - 1).map(c => c.trim());
+        tableLines.push(cells);
         continue;
       } else if (inTable) {
         inTable = false;
-        tableHtml += '</table>';
-        html += tableHtml;
-        tableHtml = '';
+        html += renderTable(tableLines);
+        tableLines = [];
       }
 
       if (trimmed.startsWith('### ')) {
@@ -1018,12 +1004,60 @@
         html += formatInline(trimmed) + '<br>';
       }
     }
+    if (inTable) html += renderTable(tableLines);
+    return html;
+  }
 
-    if (inTable) {
-      tableHtml += '</table>';
-      html += tableHtml;
+  function renderTable(rows) {
+    if (rows.length === 0) return '';
+    const numRows = rows.length;
+    const numCols = Math.max(...rows.map(r => r.length));
+    for (let r = 0; r < numRows; r++) {
+      while (rows[r].length < numCols) rows[r].push('');
     }
 
+    const sp = [];
+    for (let r = 0; r < numRows; r++) {
+      sp[r] = [];
+      for (let c = 0; c < numCols; c++) {
+        sp[r][c] = { rs: 1, cs: 1, skip: false };
+      }
+    }
+
+    // 마커 기반 병합 (^ = rowspan 계속, > = colspan 계속)
+    for (let r = 0; r < numRows; r++) {
+      for (let c = 0; c < numCols; c++) {
+        if (rows[r][c] === '^' && r > 0) {
+          // 위로 올라가며 원본 셀 찾기
+          let origin = r - 1;
+          while (origin > 0 && rows[origin][c] === '^') origin--;
+          sp[origin][c].rs++;
+          sp[r][c].skip = true;
+        }
+        if (rows[r][c] === '>' && c > 0) {
+          // 왼쪽으로 가며 원본 셀 찾기
+          let origin = c - 1;
+          while (origin > 0 && rows[r][origin] === '>') origin--;
+          sp[r][origin].cs++;
+          sp[r][c].skip = true;
+        }
+      }
+    }
+
+    let html = '<table>';
+    for (let r = 0; r < numRows; r++) {
+      html += '<tr>';
+      const tag = r === 0 ? 'th' : 'td';
+      for (let c = 0; c < numCols; c++) {
+        if (sp[r][c].skip) continue;
+        let attrs = '';
+        if (sp[r][c].rs > 1) attrs += ' rowspan="' + sp[r][c].rs + '"';
+        if (sp[r][c].cs > 1) attrs += ' colspan="' + sp[r][c].cs + '"';
+        html += '<' + tag + attrs + '>' + escapeHtmlPreserveBr(rows[r][c]) + '</' + tag + '>';
+      }
+      html += '</tr>';
+    }
+    html += '</table>';
     return html;
   }
 

@@ -268,15 +268,23 @@ fn render_table_with_merge(rows: &[Vec<CellInfo>]) -> String {
 
             match cell.vmerge {
                 VMerge::Continue => {
-                    // 위 셀의 내용 연속 — 빈칸으로
+                    grid_row[col_pos] = "^".to_string();
                     let span = cell.grid_span as usize;
+                    for k in 1..span {
+                        if col_pos + k < max_cols {
+                            grid_row[col_pos + k] = ">".to_string();
+                        }
+                    }
                     col_pos += span;
                 }
                 _ => {
-                    // None 또는 Restart — 내용 배치
                     grid_row[col_pos] = cell.text.clone();
                     let span = cell.grid_span as usize;
-                    // gridSpan > 1이면 나머지 열은 빈칸
+                    for k in 1..span {
+                        if col_pos + k < max_cols {
+                            grid_row[col_pos + k] = ">".to_string();
+                        }
+                    }
                     col_pos += span;
                 }
             }
